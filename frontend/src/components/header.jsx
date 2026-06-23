@@ -2,24 +2,23 @@ import React from 'react';
 
 export default function Header({ onNavigateHome }) {
   return (
-    //  Text-left and justify-start completely pins the branding block to the left boundary edge
-    <header className="w-full text-left flex justify-start items-center pt-[3rem]">
+    <header className="mt-6 w-full text-left flex justify-start items-center pt-[3rem]">
       <button
         type="button"
         onClick={onNavigateHome}
-        className="flex items-center gap-3 text-left cursor-pointer"
+        className="flex items-center gap-2 text-left cursor-pointer"
         aria-label="Go to landing page"
       >
         <img
           src="/logo.png" 
           alt="FloodIQ Logo" 
-          className="w-10 h-10 sm:w-12 sm:h-12" 
+          className="w-12 h-12 sm:w-16 sm:h-16 object-contain" 
         />
-        <div className="text-left">
-          <h1 className="font-['Syne'] font-black text-2xl sm:text-4xl tracking-tight text-gray-900 leading-none">
+        <div className="flex flex-col -space-y-1 text-left">
+          <h1 className="font-['Syne'] font-black text-3xl sm:text-5xl tracking-tight text-gray-900 leading-none">
             FloodIQ
           </h1>
-          <p className="font-['DM_Mono'] text-[10px] sm:text-xs tracking-widest text-[#0A8F7A] uppercase mt-1 leading-none">
+          <p className="font-['DM_Mono'] text-[11px] sm:text-sm tracking-[0.15em] text-[#0A8F7A] uppercase mt-0 leading-none">
             Lagos Flood Prediction
           </p>
         </div>

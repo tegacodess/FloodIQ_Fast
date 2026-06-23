@@ -3,7 +3,7 @@ import { Home, Building2, Users, MapPin, CloudRain, BarChart2 } from 'lucide-rea
 
 const steps = [
   { Icon: MapPin,    title: 'Pick a location & date',      desc: 'Choose any neighbourhood across Lagos.' },
-  { Icon: CloudRain, title: 'We pull the weather data',     desc: 'Live forecasts, archives, or seasonal estimates — automatically.' },
+  { Icon: CloudRain, title: 'We pull the weather data',     desc: 'Live forecasts, archives, or seasonal estimates obtained automatically.' },
   { Icon: BarChart2, title: 'You find out if it floods',      desc: 'A 3-day flood outlook with AI-guided next steps.' },
 ];
 
@@ -18,7 +18,7 @@ export default function Landing({ setPage }) {
     <div className="w-full flex flex-col gap-10 animate-fadeIn text-gray-600">
 
       {/* ── HERO BANNER SECTION ── */}
-      <div className="border border-gray-200/80 bg-[#F2F8FF] rounded-2xl shadow-sm p-6 sm:p-8 md:p-10 flex flex-col gap-8 w-full">
+      <div className="mt-6 border border-gray-200/80 bg-[#F2F8FF] rounded-2xl shadow-sm py-4 px-5 sm:py-5 sm:px-7 flex flex-col gap-8 w-full">
         
         {/* Core Header Text Elements */}
         <div>

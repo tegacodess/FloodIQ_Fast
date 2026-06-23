@@ -2,6 +2,26 @@
    ⚡ RESPONSIVE UNIVERSAL TEXT SIZE OVERRIDES 
    ========================================== */
 
+  
+/* 🚨 FORCE RESET MOBILE BASELINE 🚨 */
+@media (max-width: 767px) {
+  html, body {
+    font-size: 14px !important; /* Forces the whole system rem baseline to shrink */
+  }
+  
+  h1, .text-4xl, .text-5xl {
+    font-size: 1.75rem !important; /* Clamps massive headers down on mobile */
+  }
+
+  h2, .text-2xl, .text-3xl {
+    font-size: 1.35rem !important; /* Clamps section sub-headers down on mobile */
+  }
+
+  p, span, div, .text-sm, .text-base {
+    font-size: 0.85rem !important; /* Completely compresses paragraph blocks */
+    line-height: 1.3rem !important;
+  }
+}   
 /* Default rules for Mobile Devices (keeps text highly readable but compact) */
 .text-xs, p.text-xs, span.text-xs, .font-mono.text-xs {
   font-size: 0.85rem !important; /* ~13.5px */
