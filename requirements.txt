@@ -8,4 +8,5 @@ fastapi
 uvicorn
 pydantic
 python-dotenv
-supabase
+openmeteo-requests
+retry-requests
