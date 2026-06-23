@@ -1,0 +1,11 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local environment variables
+.env
+
+
+# Frontend build tools
+node_modules/
+frontend/dist/
