@@ -1,11 +1,19 @@
 # Python bytecode
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
 # Local environment variables
-.env
+.env.*
+.env.local
 
 
 # Frontend build tools
 node_modules/
 frontend/dist/
+
+# local cache database
+*.sqlite
+.cache.sqlite
