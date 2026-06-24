@@ -12,7 +12,7 @@ from typing import Optional
 import os
 from dotenv import load_dotenv
 import requests 
-
+from fastapi.responses import RedirectResponse
 
 load_dotenv()  
 
@@ -26,9 +26,16 @@ from logic.helpers import (build_context, groq_chat)
 # App setup 
 app = FastAPI(title="FloodIQ API", version="1.0.0")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",          # local Vite development server
+    "http://127.0.0.1:5173",          # Local fallback
+    "https://floodiq.vercel.app",     # live production Vercel URL
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,    
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -292,8 +299,8 @@ async def serve_static_files_or_spa(file_path: str):
     if file_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Endpoint Not Found")
         
-    # 3. SPA Fallback: If it's a page route (like /form or /results), serve index.html
-    return FileResponse(str(frontend_dist / "index.html"))
+    # 3. If the Render link is opened, redirect here automatically redirect them to Vercel!
+    return RedirectResponse(url="https://floodiq.vercel.app")
 # RUN
 
 if __name__ == "__main__":
