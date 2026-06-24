@@ -216,8 +216,6 @@ def predict(req: PredictRequest):
         grid_cell, is_climatology
     )
 
-    # # Summarise
-    # max_prob, avg_prob, flood_days = summarise_forecast(predictions)
 
     # Serialise day cards
     days = []
@@ -286,22 +284,15 @@ def chat_message(req: ChatRequest):
 # SERVE FRONTEND
 frontend_dist = BASE_DIR / "frontend" / "dist"
 
-# 1. First, catch any requests for static files (like logo.png, robots.txt, favicon.ico)
-# sitting directly in the dist root, or chunks inside assets/
-@app.get("/{file_path:path}")
-async def serve_static_files_or_spa(file_path: str):
-    # If the request matches a real file in the dist folder (like logo.png or assets/index.js)
-    file_location = frontend_dist / file_path
-    if file_location.is_file():
-        return FileResponse(str(file_location))
-        
-    # 2. Prevent intercepting API endpoints accidentally
+# REDIRECT ROUTE 
+@app.api_route("/{file_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def catch_all_and_redirect(file_path: str):
+    # If it looks like an API call that missed a real endpoint, give a clean 404 instead of redirecting
     if file_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="Endpoint Not Found")
+        raise HTTPException(status_code=404, detail="API Endpoint Not Found")
         
-    # 3. If the Render link is opened, redirect here automatically redirect them to Vercel!
-    return RedirectResponse(url="https://floodiq.vercel.app")
-# RUN
+    # Redirect all browser traffic to your clean Vercel frontend
+    return RedirectResponse(url="https://floodiq.vercel.app", status_code=307)
 
 if __name__ == "__main__":
     import uvicorn
