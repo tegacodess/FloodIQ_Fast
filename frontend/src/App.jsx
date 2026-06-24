@@ -4,7 +4,7 @@ import LandingPanel from './components/landing';
 import QueryForm from './components/queryform';
 import ForecastResults from './components/results';
 import './App.css';
-
+import {Analytics} from '@vercel/analytics/react';
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 
@@ -83,6 +83,8 @@ export default function App() {
           restartPipeline={restartPipeline}
         />
       )}
+
+      <Analytics />
     </div>
   </div>
 );
