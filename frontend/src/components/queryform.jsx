@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export default function QueryForm({ setPage, locationData, setLocationData, executeSimulation, loading }) {
   const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +24,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
         
         
         try {
-          const res = await fetch(`/api/reverse-geocode`, {
+          const res = await fetch(`${BASE_URL}/api/reverse-geocode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat: latitude, lon: longitude })
@@ -68,7 +70,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
   const handleAreaLookup = async () => {
     if (!searchQuery.trim()) return;
     try {
-      const res = await fetch('/api/area-lookup', {
+      const res = await fetch(`${BASE_URL}/api/area-lookup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery })

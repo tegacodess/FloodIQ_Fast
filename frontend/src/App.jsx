@@ -5,6 +5,9 @@ import QueryForm from './components/queryform';
 import ForecastResults from './components/results';
 import './App.css';
 
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
+
 export default function App() {
   // 💡 State values simplified to focus exclusively on routing pages
   const [page, setPage] = useState('intro');
@@ -12,13 +15,13 @@ export default function App() {
   const [predictionResult, setPredictionResult] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-
+  
   const executeSimulation = async (dateInput, searchQuery, setLookupStatus) => {
     if (!locationData) return alert("Please clarify your target Lagos coordinates first.");
     setLoading(true);
 
     try {
-      const res = await fetch('/api/predict', {
+      const res = await fetch(`${BASE_URL}/api/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

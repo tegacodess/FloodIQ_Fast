@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, CloudRain, Thermometer, Droplets, MapPin, Mountain, RotateCw } from 'lucide-react';
 
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
+
 export default function Results({ predictionResult, chatHistory = [], setChatHistory, restartPipeline }) {
   const [chatInput, setChatInput] = useState('');
   const chatContainerRef = useRef(null);
@@ -14,7 +17,7 @@ export default function Results({ predictionResult, chatHistory = [], setChatHis
       const hiddenPrompt = `Explain the flood forecast for ${predictionResult.location_name || 'in plain English'}. What should residents know and do? Be concise and practical.`;
 
       try {
-        const res = await fetch('/api/chat/message', {
+        const res = await fetch(`${BASE_URL}/api/chat/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -92,7 +95,7 @@ export default function Results({ predictionResult, chatHistory = [], setChatHis
     setChatHistory(baseHistory);
 
     try {
-      const res = await fetch('/api/chat/message', {
+      const res = await fetch(`${BASE_URL}/api/chat/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
