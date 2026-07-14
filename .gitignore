@@ -18,3 +18,8 @@ frontend/dist/
 # local cache database
 *.sqlite
 .cache.sqlite
+
+database/export_database.py
+database/backfill_database.py
+
+location_update

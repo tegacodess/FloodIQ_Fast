@@ -13,15 +13,21 @@ import os
 from dotenv import load_dotenv
 import requests 
 from fastapi.responses import RedirectResponse
+from supabase import create_client
+
+supabase = create_client(
+    supabase_url=os.getenv("SUPABASE_URL"),
+    supabase_key=os.getenv("SUPABASE_KEY")
+)
 
 load_dotenv()  
 
 # Import logic modules 
-from logic.config import FLOODIQ_MODEL, LAGOS_AREAS, GRID_CELLS, DEFAULT_THRESHOLD
-from logic.helpers import fetch_weather
-from logic.prediction_logic import (load_model, nearest_grid,
-                                     run_prediction)
-from logic.helpers import (build_context, groq_chat)
+
+from logic.config import FLOODIQ_MODEL, DEFAULT_THRESHOLD
+# Update your import
+from logic.prediction_logic import load_model, run_prediction  
+from logic.helpers import (build_context, groq_chat, fetch_weather, find_nearest_db_location, get_dynamic_topo)
 
 # App setup 
 app = FastAPI(title="FloodIQ API", version="1.0.0")
@@ -96,32 +102,52 @@ def get_areas():
 
 @app.post("/api/area-lookup")
 def area_lookup(req: AreaLookupRequest):
-    """Resolve area name to coordinates"""
-    key = req.query.lower().strip()
-    if key in LAGOS_AREAS:
-        lat, lon = LAGOS_AREAS[key]
-        return {"found": True, "lat": lat, "lon": lon,
-                "display_name": req.query.title()}
-    # Fuzzy: check if query is contained in any key
-    for area_key, coords in LAGOS_AREAS.items():
-        if key in area_key or area_key in key:
-            return {"found": True, "lat": coords[0], "lon": coords[1],
-                    "display_name": area_key.title()}
-    return {"found": False}
+    """Resolves an area name to dynamic database coordinates or falls back to an API search"""
+    query_str = req.query.lower().strip()
+    
+    try:
+        # Step A: Check if this granular area exists inside your own Supabase records
+        res = supabase.table("locations").select("*").ilike("location_detail", f"%{query_str}%").execute()
+        if res.data:
+            loc = res.data[0]
+            return {
+                "found": True, 
+                "lat": loc['latitude'], 
+                "lon": loc['longitude'],
+                "display_name": loc['location_detail'].title()
+            }
+            
+        # Step B: Fallback (Optional) — If a brand new street/town isn't database mapped yet, 
+        # you could call Nominatim forward geocoding here, or return False so the UI prompts them.
+        return {"found": False}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/reverse-geocode")
 def reverse_geocode(req: ReverseGeocodeRequest):
-    """Convert lat/lon to human-readable place name via Nominatim (OSM).
-    Free, no API key required. Returns neighbourhood/suburb or area name."""
+    """
+    Converts browser auto-detect coordinates to a human-readable name, 
+    while snapping them to your closest granular database coordinate.
+    """
+    
+    # Snap the user's coordinates to nearest database point
+    nearest_loc = find_nearest_db_location(req.lat, req.lon, supabase)
+    
+    # Target coordinates to resolve (default to raw if database is empty)
+    target_lat = nearest_loc['latitude'] if nearest_loc else req.lat
+    target_lon = nearest_loc['longitude'] if nearest_loc else req.lon
+
     try:
+        # Pass coordinates to Nominatim to get a friendly local name
         response = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
             params={
-                "lat": req.lat,
-                "lon": req.lon,
+                "lat": target_lat,
+                "lon": target_lon,
                 "format": "json",
-                "zoom": 14,          # neighbourhood level
+                "zoom": 14,
                 "addressdetails": 1,
             },
             headers={"User-Agent": "FloodIQ/1.0 (lagos-flood-prediction)"},
@@ -129,46 +155,37 @@ def reverse_geocode(req: ReverseGeocodeRequest):
         )
         response.raise_for_status()
         data = response.json()
-
         addr = data.get("address", {})
 
-        # Build a readable name — try most specific first
         name = (
             addr.get("neighbourhood") or
             addr.get("suburb") or
             addr.get("quarter") or
             addr.get("village") or
             addr.get("town") or
-            addr.get("city_district") or
-            addr.get("county") or
             "Lagos"
         )
 
-        # Append state/city for context if available
-        state = addr.get("state", "")
-        city  = addr.get("city") or addr.get("town") or ""
-
-
-        # uncomment when you expand to other Nigerian cities/states
-        # if city and city.lower() not in name.lower():
-        #     display = f"{name}, {city}"
-        # elif state:
-        #     display = f"{name}, {state}"
-        # else:
-        #     display = name
-
-        display = name
+        # If database already had a name for this point, use it
+        display_name = nearest_loc['location_detail'].title() if (nearest_loc and nearest_loc.get('location_detail')) else name
 
         return {
             "found": True,
-            "display_name": display,
+            "display_name": display_name,
+            "lat": target_lat,  # Returns the snapped coordinate so map works 
+            "lon": target_lon,
             "raw_address": addr,
         }
 
-    except requests.exceptions.Timeout:
-        return {"found": False, "error": "Geocoding service timed out"}
     except Exception as e:
-        return {"found": False, "error": str(e)}
+        # If the API times out, fall back to snapped coordinates with a generic name
+        return {
+            "found": True,
+            "display_name": nearest_loc['location_detail'].title() if nearest_loc else "Auto-Detected Location",
+            "lat": target_lat,
+            "lon": target_lon,
+            "error": f"Nominatim API failed, used database fallback: {str(e)}"
+        }
 
 
 @app.post("/api/predict")
@@ -195,9 +212,16 @@ def predict(req: PredictRequest):
 
 
     # Get topo features & run prediction
-    topo, grid_cell = nearest_grid(req.lat, req.lon)
+    topo_data = get_dynamic_topo(req.lat, req.lon)    
+    if not topo_data or topo_data.get("error") == "INSUFFICIENT_DATA":
+        raise HTTPException(
+            status_code=422, 
+            detail="Could not resolve topography for this location")
+
     predictions = run_prediction(
-        weather_df.copy(), topo, FLOODIQ_MODEL,
+        weather_df.copy(), 
+        topo_data, 
+        FLOODIQ_MODEL,
         threshold=DEFAULT_THRESHOLD
     )
 
@@ -209,6 +233,9 @@ def predict(req: PredictRequest):
 
     max_prob = float(predictions['flood_prob'].max()) # Extracts the highest probability (e.g., 1.0)
     flood_days = int((predictions['risk_level'] == 'HIGH').sum())
+
+
+    grid_cell = [topo_data.get('latitude', req.lat), topo_data.get('longitude', req.lon)]
 
     # Build context string for AI
     context = build_context(
@@ -232,19 +259,17 @@ def predict(req: PredictRequest):
         })
 
     return {
-        "location_name":   req.location_name,
-        "lat":             req.lat,
-        "lon":             req.lon,
-        "grid_cell":    list(grid_cell) if hasattr(grid_cell, '__iter__') else [req.lat, req.lon],
-        "elevation":       float(topo) if not isinstance(topo, dict) else topo.get('elevation', 0.0),
-        "is_climatology":  is_climatology,
-        "flood_days": flood_days,
+        "location_name":  req.location_name,
+        "lat":            req.lat,
+        "lon":            req.lon,
+        "grid_cell":      [req.lat, req.lon], # Simplified
+        "elevation":      float(topo_data.get('elevation', 0.0)),
+        "is_climatology": is_climatology,
+        "flood_days":     flood_days,
         "max_probability": round(max_prob, 4),
-        # "avg_probability": round(float(avg_prob), 4),
-        "days":            days,
+        "days":           days,
         "prediction_context": context,
     }
-
  
 
 @app.post("/api/chat/init")

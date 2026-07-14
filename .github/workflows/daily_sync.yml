@@ -1,0 +1,31 @@
+name: Daily FloodIQ Weather Sync
+
+on:
+  schedule:
+    # Runs everyday at 1:00 AM UTC (2:00 AM Lagos Time)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Allows you to trigger it manually from GitHub anytime
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-python: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily update script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python -m database.sync_daily_weather

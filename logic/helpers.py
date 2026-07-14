@@ -9,7 +9,7 @@ import openmeteo_requests
 import requests_cache
 from retry_requests import retry
 from supabase import create_client
-
+import os
 
 from .config import (
     ARCHIVE_API_URL,
@@ -17,7 +17,7 @@ from .config import (
     FORECAST_DAYS,
 )
 
-
+supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
 
 def _normalize_start_date(start_date):
     if start_date is None:
@@ -254,6 +254,66 @@ def fetch_weather(lat, lon, days=FORECAST_DAYS, start_date=None):
             return _fetch_archive_climatology(lat, lon, days, start_day), None, "climatology"
         except Exception as fallback_error:
             return None, f"Weather fetch failed: {primary_error}; climatology fallback failed: {fallback_error}", None            
+
+
+def find_nearest_db_location(lat: float, lon: float):
+    """
+    Takes raw coordinates (like from a browser auto-detect) and snaps them
+    to the nearest exact coordinate point available in your Supabase database.
+    """
+    try:
+        # Fetch all known granular coordinates from your database
+        res = supabase.table("locations").select("latitude", "longitude", "location_detail").execute()
+        if not res.data:
+            return None
+            
+        # Build coordinate arrays
+        db_coords = np.array([[loc['latitude'], loc['longitude']] for loc in res.data])
+        target_coord = np.array([lat, lon])
+        
+        # Calculate Euclidean distance to find the absolute closest point
+        distances = np.linalg.norm(db_coords - target_coord, axis=1)
+        nearest_idx = np.argmin(distances)
+        
+        return res.data[nearest_idx]
+    except Exception as e:
+        print(f"Nearest database neighbor lookup failed: {e}")
+        return None
+
+
+def get_dynamic_topo(lat: float, lon: float):
+    """
+    Queries Supabase for the terrain details. 
+    If it's a new street, fetches high-res elevation on-the-fly.
+    """
+    try:
+        # Use the supabase client initialized at the top of helpers.py
+        # 1. Exact match attempt
+        res = supabase.table("locations").select("*").eq("latitude", lat).eq("longitude", lon).execute()
+        if res.data:
+            return res.data[0]
+            
+        # 2. If no exact match, find the nearest neighbor in your database 
+        nearest = find_nearest_db_location(lat, lon)
+        if nearest:
+            return nearest
+            
+        # 4.  last resort, fetch from API (but handle missing keys carefully)
+        url = f"{os.getenv('ELEVATION_API_URL')}?latitude={lat}&longitude={lon}"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        fine_elev = float(requests.get(url, timeout=5).json()["elevation"][0])
+        
+        return {
+            "error": "INSUFFICIENT_DATA",
+            "latitude": lat, 
+            "longitude": lon
+        }
+        
+    except Exception as e:
+        # Log the error but keep the system running
+        print(f"Dynamic topo lookup failed: {e}")
+        return None
 
 def build_context(
     predictions: pd.DataFrame,
