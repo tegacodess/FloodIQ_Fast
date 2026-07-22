@@ -8,6 +8,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
   const [activeTab, setActiveTab] = useState('area'); // Options: 'area', 'auto'
   const [lookupStatus, setLookupStatus] = useState({ text: '', type: '' });
   const [isDetecting, setIsDetecting] = useState(false);
+   const [isMatching, setIsMatching] = useState(false);
 
   const handleAutoLocation = () => {
     if (!navigator.geolocation) {
@@ -61,7 +62,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
       setLookupStatus({ text: '', type: '' });
     }
     
-    // If the user clicks Auto Detect, immediately fire the GPS pipeline!
+    // If the user clicks Auto Detect, immediately fire the GPS pipeline
     if (tab === 'auto') {
       handleAutoLocation();
     }
@@ -69,6 +70,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
 
   const handleAreaLookup = async () => {
     if (!searchQuery.trim()) return;
+    setIsMatching(true);
     try {
       const res = await fetch(`${BASE_URL}/api/area-lookup`, {
         method: 'POST',
@@ -86,10 +88,12 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
         setLookupStatus({ text: `${display} (${data.lat.toFixed(3)} , ${data.lon.toFixed(3)})`, type: 'success' });
       } else {
         setLocationData(null);
-        setLookupStatus({ text: 'Location index not found. Try: Yaba, Ikeja, Lekki...', type: 'error' });
+        setLookupStatus({ text: 'Location index not found. Try: Victoria Garden City, Makoko, Lekki...', type: 'error' });
       }
     } catch (err) {
       setLookupStatus({ text: err.message || 'Connection timeout matching area grid maps.', type: 'error' });
+    } finally {
+      setIsMatching(false);
     }
   };
 
@@ -107,7 +111,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
         />
       </div>
 
-      {/* ── RESPONSIVE NAVIGATION SLIDE TABS AREA ── */}
+      {/*  RESPONSIVE NAVIGATION SLIDE TABS AREA */}
       <div className="mb-6 w-full">
         <label className="block font-['DM_Mono'] text-xs text-gray-400 uppercase mb-3 tracking-wider">User Location</label>
         
@@ -129,7 +133,7 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
           </button>
         </div>
 
-        {/* ── TAB LAYOUT CHANNELS ── */}
+        {/*  TAB LAYOUT CHANNELS  */}
         <div className="w-full min-h-[60px]">
           
           {/* TAB 1: Area Text Box Query Input */}
@@ -142,15 +146,20 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ikeja, Lekki, VI, Surulere, Yaba..."
+                placeholder="Ikeja, Makoko, Ibeju-Lekki, VI, Surulere, Yaba..."
                 className="flex-1 min-w-0 p-3.5 rounded-xl border border-gray-300 bg-white font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0A8F7A] shadow-sm"
               />
               <button 
                 type="submit" 
-                className="bg-[#0A8F7A]/10 text-[#0A8F7A] hover:bg-[#0A8F7A]/20 px-5 rounded-xl font-bold border border-[#0A8F7A]/20 transition-colors shrink-0"
-              >
-                Match
-              </button>
+                disabled={isMatching}
+                className="bg-[#0A8F7A]/10 text-[#0A8F7A] hover:bg-[#0A8F7A]/20 px-5 rounded-xl font-bold border border-[#0A8F7A]/20 transition-colors shrink-0 flex items-center justify-center min-w-[76px]"
+              
+              > {isMatching ? (
+                <span className="w-4 h-4 rounded-full border-2 border-[#0A8F7A] border-t-transparent animate-spin"></span>
+              ) : (
+                'Match'
+              )}
+              </button>    
             </form>
           )}
 
@@ -196,10 +205,15 @@ export default function QueryForm({ setPage, locationData, setLocationData, exec
             type="button"
             onClick={() => executeSimulation(dateInput, searchQuery, setLookupStatus)}
             disabled={loading || !locationData}
-            className="w-full bg-[#0A8F7A] hover:bg-[#087363] text-white font-black py-3.5 px-6 rounded-xl disabled:opacity-40 shadow-sm transition-colors text-center text-sm tracking-wide font-['Syne']"
+            className="w-full bg-[#0A8F7A] hover:bg-[#087363] text-white font-black py-3.5 px-6 rounded-xl disabled:opacity-40 shadow-sm transition-colors text-center text-sm tracking-wide font-['Syne'] flex items-center justify-center gap-2"
           >
-            Predict
-          </button>
+            {loading ? (
+              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+            ) : (
+              'Predict'
+            )}
+          </button>                
+
           {loading && lookupStatus.type === 'info' && (
             <p className="mt-2 text-xs font-medium text-[#0A8F7A]">
               {lookupStatus.text || 'Fetching weather data...'}

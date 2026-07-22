@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/header';
 import LandingPanel from './components/landing';
 import QueryForm from './components/queryform';
@@ -7,15 +7,53 @@ import './App.css';
 import {Analytics} from '@vercel/analytics/react';
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
+// Persists a piece of state to sessionStorage, so it survives a page
+// reload but clears itself when the tab/browser is closed.
+function usePersistedState(key, defaultValue) {
+  const [state, setState] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (state === null || state === undefined) {
+        sessionStorage.removeItem(key);
+      } else {
+        sessionStorage.setItem(key, JSON.stringify(state));
+      }
+    } catch {
+      // sessionStorage unavailable will fail silently,
+      // app still works, it just won't survive a reload
+    }
+  }, [key, state]);
+
+  return [state, setState];
+}
 
 export default function App() {
-  // 💡 State values simplified to focus exclusively on routing pages
-  const [page, setPage] = useState('intro');
+  // Persisted: which page + the actual prediction data
+  const [page, setPage] = usePersistedState('floodiq_page', 'intro');
+  const [predictionResult, setPredictionResult] = usePersistedState('floodiq_prediction', null);
+
+  // NOT persisted: form selection and chat history reset on every reload
   const [locationData, setLocationData] = useState(null);
-  const [predictionResult, setPredictionResult] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+
+  // Safety net: if a reload somehow lands on 'results' without a prediction
+  // (e.g. sessionStorage was cleared but not in sync), fall back to 'form'
+  // instead of rendering a blank page.
+  useEffect(() => {
+    if (page === 'results' && !predictionResult) {
+      setPage('form');
+    }
+  }, []); // only check once, on mount
+
   const executeSimulation = async (dateInput, searchQuery, setLookupStatus) => {
     if (!locationData) return alert("Please clarify your target Lagos coordinates first.");
     setLoading(true);
@@ -32,7 +70,7 @@ export default function App() {
         })
       });
       if (!res.ok) throw new Error("Backend pipeline processing fault.");
-      
+
       const data = await res.json();
       setPredictionResult(data);
       setPage('results');
@@ -51,41 +89,42 @@ export default function App() {
   };
 
   const navigateHome = () => {
+    setPredictionResult(null);
+    setChatHistory([]);
+    setLocationData(null);
     setPage('intro');
   };
 
   return (
-  // 💡 FIXED: py-4 on mobile bumps up to py-8 on desktop. Left/right margin tracking optimized.
-  <div className="min-h-screen w-full bg-white text-gray-800 py-4 sm:py-8">
-    <div className="w-full px-4 sm:px-8 lg:px-16">
-      {/* 💡 FIXED: mb-4 on mobile reduces the huge gap before the hero card snaps in */}
-      <div className="mb-4 sm:mb-10 w-full text-left">
-        <Header onNavigateHome={navigateHome} />
-      </div>
-      
-      {page === 'intro' && <LandingPanel setPage={setPage} />}
-      
-      {page === 'form' && (
-        <QueryForm 
-          setPage={setPage} 
-          locationData={locationData}
-          setLocationData={setLocationData}
-          executeSimulation={executeSimulation}
-          loading={loading}
-        />
-      )}
-      
-      {page === 'results' && predictionResult && (
-        <ForecastResults 
-          predictionResult={predictionResult}
-          chatHistory={chatHistory}
-          setChatHistory={setChatHistory}
-          restartPipeline={restartPipeline}
-        />
-      )}
+    <div className="min-h-screen w-full bg-white text-gray-800 py-4 sm:py-8">
+      <div className="w-full px-4 sm:px-8 lg:px-16">
+        <div className="mb-4 sm:mb-10 w-full text-left">
+          <Header onNavigateHome={navigateHome} />
+        </div>
 
-      <Analytics />
+        {page === 'intro' && <LandingPanel setPage={setPage} />}
+
+        {page === 'form' && (
+          <QueryForm
+            setPage={setPage}
+            locationData={locationData}
+            setLocationData={setLocationData}
+            executeSimulation={executeSimulation}
+            loading={loading}
+          />
+        )}
+
+        {page === 'results' && predictionResult && (
+          <ForecastResults
+            predictionResult={predictionResult}
+            chatHistory={chatHistory}
+            setChatHistory={setChatHistory}
+            restartPipeline={restartPipeline}
+          />
+        )}
+
+        <Analytics />
+      </div>
     </div>
-  </div>
-);
+  );
 }

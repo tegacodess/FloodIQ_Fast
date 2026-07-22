@@ -19,7 +19,6 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_yesterdays_date():
-    """Gets yesterday's date string."""
     yesterday = datetime.now() - timedelta(days=1)
     return yesterday.strftime("%Y-%m-%d")
 
@@ -48,7 +47,7 @@ def fetch_open_meteo_daily_record(date_str, lat, lon):
         daily = data["daily"]
         hourly = data["hourly"]
         
-        # --- 1. Process Hourly Block ---
+        #  Process Hourly Block
         hourly_frame = pd.DataFrame({
             "soil_moisture": hourly["soil_moisture_0_to_7cm"],
             "runoff_hr": hourly["runoff"],
@@ -58,7 +57,7 @@ def fetch_open_meteo_daily_record(date_str, lat, lon):
         swvl1 = float(hourly_frame["soil_moisture"].mean()) if not hourly_frame["soil_moisture"].isna().all() else 0.25
         runoff_mm = float(hourly_frame["runoff_hr"].sum()) if not hourly_frame["runoff_hr"].isna().all() else 0.0
         
-        # --- 2. Extract Daily Basics ---
+        # Extract Daily Basics 
         tp_mm = daily["precipitation_sum"][0] if daily["precipitation_sum"][0] is not None else 0.0
         temp_c = daily["temperature_2m_mean"][0] if daily["temperature_2m_mean"][0] is not None else 25.0
         

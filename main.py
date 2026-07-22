@@ -14,18 +14,20 @@ from dotenv import load_dotenv
 import requests 
 from fastapi.responses import RedirectResponse
 from supabase import create_client
+from logic.landmark_constants import LANDMARK_AREAS
+
+
+load_dotenv() 
 
 supabase = create_client(
     supabase_url=os.getenv("SUPABASE_URL"),
     supabase_key=os.getenv("SUPABASE_KEY")
 )
-
-load_dotenv()  
+ 
 
 # Import logic modules 
 
 from logic.config import FLOODIQ_MODEL, DEFAULT_THRESHOLD
-# Update your import
 from logic.prediction_logic import load_model, run_prediction  
 from logic.helpers import (build_context, groq_chat, fetch_weather, find_nearest_db_location, get_dynamic_topo)
 
@@ -64,9 +66,8 @@ def startup_load_models():
     else:
         print("GROQ_API_KEY not set — AI assistant will be disabled")
 
-# ================================================================
+
 # REQUEST / RESPONSE MODELS
-# ================================================================
 
 class PredictRequest(BaseModel):
     lat: float
@@ -90,40 +91,34 @@ class ReverseGeocodeRequest(BaseModel):
     lat: float
     lon: float
 
-# ================================================================
 # ENDPOINTS
-# ================================================================
 
 @app.get("/api/areas")
 def get_areas():
     """Return list of known Lagos areas"""
-    return {"areas": list(LAGOS_AREAS.keys())}
+    return {"areas": list(LANDMARK_AREAS.keys())}
+
 
 
 @app.post("/api/area-lookup")
 def area_lookup(req: AreaLookupRequest):
-    """Resolves an area name to dynamic database coordinates or falls back to an API search"""
     query_str = req.query.lower().strip()
-    
+
+    # Step A: hardcoded high-level areas -- instant, no network, no DB
+    if query_str in LANDMARK_AREAS:
+        lm = LANDMARK_AREAS[query_str]
+        return {"found": True, "lat": lm["lat"], "lon": lm["lon"], "display_name": lm["display_name"]}
+
+    # Step B: granular neighborhood match (unchanged)
     try:
-        # Step A: Check if this granular area exists inside your own Supabase records
         res = supabase.table("locations").select("*").ilike("location_detail", f"%{query_str}%").execute()
         if res.data:
-            loc = res.data[0]
-            return {
-                "found": True, 
-                "lat": loc['latitude'], 
-                "lon": loc['longitude'],
-                "display_name": loc['location_detail'].title()
-            }
-            
-        # Step B: Fallback (Optional) — If a brand new street/town isn't database mapped yet, 
-        # you could call Nominatim forward geocoding here, or return False so the UI prompts them.
+            exact = [r for r in res.data if r["location_detail"].lower() == query_str]
+            loc = exact[0] if exact else res.data[0]
+            return {"found": True, "lat": loc['latitude'], "lon": loc['longitude'], "display_name": loc['location_detail'].title()}
         return {"found": False}
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/api/reverse-geocode")
 def reverse_geocode(req: ReverseGeocodeRequest):
