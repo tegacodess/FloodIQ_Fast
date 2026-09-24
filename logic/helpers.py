@@ -365,13 +365,21 @@ def groq_chat(api_key: str, history: list, context: str):
     CURRENT PREDICTION CONTEXT:
     {context}
     Guidelines:
+
     - Be concise, clear and practical
     - Give actionable advice specific to Lagos
     - Reference the prediction data when relevant
+    - Explain the most important risk insight rather than repeating all prediction data
     - If weather source mode says archived/historical, explicitly say this is a retrospective analysis, not a future forecast
     - If weather source mode says climatology, explicitly say this is an estimate based on historical patterns
     - Prioritise safety
-    - Keep responses under 200 words"""
+    - Keep responses under 150 words
+    - Do not use Markdown tables
+    - Do not create headings
+    - Do not use bold text
+    - Use short paragraphs and simple bullet points only
+    - Do not repeat the complete prediction data already shown in the interface
+    """
     messages = [{"role": "system", "content": system}]
     for message in history:
         role = "assistant" if message["role"] in ("model", "assistant") else "user"
