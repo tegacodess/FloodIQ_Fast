@@ -128,7 +128,7 @@ def reverse_geocode(req: ReverseGeocodeRequest):
     """
     
     # Snap the user's coordinates to nearest database point
-    nearest_loc = find_nearest_db_location(req.lat, req.lon, supabase)
+    nearest_loc = find_nearest_db_location(req.lat, req.lon)
     
     # Target coordinates to resolve (default to raw if database is empty)
     target_lat = nearest_loc['latitude'] if nearest_loc else req.lat
@@ -267,8 +267,7 @@ def predict(req: PredictRequest):
     }
  
 
-@app.post("/api/chat/init")
-#  Update to use groq_chat directly:
+
 @app.post("/api/chat/init")
 def chat_init(req: InitialExplanationRequest):
     if not GROQ_API_KEY:

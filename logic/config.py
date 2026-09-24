@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -14,6 +15,7 @@ DEFAULT_THRESHOLD = 0.5
 FORECAST_API_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_API_URL = "https://archive-api.open-meteo.com/v1/archive"
 ELEVATION_API_URL = "https://api.open-meteo.com/v1/elevation"
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # 
 # Replace them with a clean master list of features for your model:

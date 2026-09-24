@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 import numpy as np
 import pandas as pd
 import requests
 import openmeteo_requests
 import requests_cache
-from retry_requests import retry
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from supabase import create_client
 import os
 
@@ -15,6 +16,7 @@ from .config import (
     ARCHIVE_API_URL,
     FORECAST_API_URL,
     FORECAST_DAYS,
+    GROQ_MODEL
 )
 
 supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
@@ -49,10 +51,6 @@ def _build_open_meteo_frame(data: dict):
         runoff_mm=("runoff_hr", "sum"),
     ).reset_index()
 
-    aggregated = hourly_frame.groupby("date").agg(
-    swvl1=("soil_moisture", "mean"),
-    runoff_mm=("runoff_hr", "sum"),
-    ).reset_index()
 
     # fill any missing soil moisture with Lagos wet season climatological mean
     aggregated["swvl1"] = aggregated["swvl1"].fillna(0.25)
@@ -79,7 +77,15 @@ def _build_open_meteo_frame(data: dict):
 
 # Set up the cache and retry channels safely
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
-retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+retry_strategy = Retry(
+    total=5,
+    backoff_factor=0.2,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset({"GET", "POST"}),
+)
+retry_session = cache_session
+retry_session.mount("http://", HTTPAdapter(max_retries=retry_strategy))
+retry_session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
 openmeteo = openmeteo_requests.Client(session=retry_session)
 
 def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3, start_date=None):
@@ -100,7 +106,8 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
         "longitude": lon,
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date": end_date.strftime("%Y-%m-%d"),
-        "hourly": ["temperature_2m", "precipitation", "soil_moisture_0_to_10cm"],
+        "hourly": ["temperature_2m", "precipitation", "soil_moisture_0_to_7cm"],
+        "models": "era5_land",
         "timezone": "UTC"
     }
 
@@ -111,7 +118,7 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
     hourly = response.Hourly()
     hourly_temperature_2m = hourly.Variables(0).ValuesAsNumpy()
     hourly_precipitation = hourly.Variables(1).ValuesAsNumpy()
-    hourly_soil_moisture_0_to_10cm = hourly.Variables(2).ValuesAsNumpy()
+    hourly_soil_moisture_0_to_7cm = hourly.Variables(2).ValuesAsNumpy()
 
     start_time = pd.to_datetime(hourly.Time(), unit="s", utc=True)
     
@@ -125,7 +132,7 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
     
     hourly_data["temp_c"] = hourly_temperature_2m
     hourly_data["tp_mm"] = hourly_precipitation
-    hourly_data["swvl1"] = hourly_soil_moisture_0_to_10cm
+    hourly_data["swvl1"] = hourly_soil_moisture_0_to_7cm
     hourly_data["runoff_mm"] = [p * 0.15 for p in hourly_precipitation]
 
     hourly_df = pd.DataFrame(data=hourly_data)
@@ -138,7 +145,9 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
         "runoff_mm": "sum"
     }).reset_index()
 
+   
     return daily_df
+
 
     
 
@@ -373,15 +382,19 @@ def groq_chat(api_key: str, history: list, context: str):
                 "Content-Type": "application/json",
             },
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": GROQ_MODEL,
                 "messages": messages,
-                "max_tokens": 400,
+                "max_completion_tokens": 1000,
+                "reasoning_effort": "low",
                 "temperature": 0.7,
             },
-            timeout=12,
+            timeout=20,
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"], None
+        content = response.json()["choices"][0]["message"].get("content")
+        if not content:
+            return None, "Empty response from Groq API"
+        return content, None
     except requests.exceptions.HTTPError as error:
         return None, f"Groq error {error.response.status_code}: {error.response.text}"
     except Exception as error:
