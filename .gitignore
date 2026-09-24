@@ -23,3 +23,5 @@ database/export_database.py
 database/backfill_database.py
 
 location_update
+
+.vscode/settings.json
