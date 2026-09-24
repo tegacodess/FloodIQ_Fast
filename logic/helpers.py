@@ -107,9 +107,11 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date": end_date.strftime("%Y-%m-%d"),
         "hourly": ["temperature_2m", "precipitation", "soil_moisture_0_to_7cm"],
-        "models": "era5_land",
         "timezone": "UTC"
     }
+
+    if "archive-api.open-meteo.com" in api_url:
+        params["models"] = "era5_land"
 
     # Use the modular api_url passed from fetch_weather
     responses = openmeteo.weather_api(api_url, params=params)
@@ -144,6 +146,7 @@ def _fetch_open_meteo_window(api_url: str, lat: float, lon: float, days: int = 3
         "swvl1": "mean",
         "runoff_mm": "sum"
     }).reset_index()
+    
 
    
     return daily_df
